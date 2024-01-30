@@ -2166,7 +2166,7 @@ declare namespace chrome.declarativeContent {
         /** Optional. Matches if the scheme of the URL is equal to any of the schemes specified in the array.  */
         schemes?: string[] | undefined;
         /** Optional. Matches if the port of the URL is contained in any of the specified port lists. For example [80, 443, [1000, 1200]] matches all requests on port 80, 443 and in the range 1000-1200.  */
-        ports?: (number | number[])[] | undefined;
+        ports?: Array<number | number[]> | undefined;
     }
 
     export class PageStateMatcherProperties {
@@ -3411,7 +3411,7 @@ declare namespace chrome.events {
         /** Optional. Matches if the URL (without fragment identifier) ends with a specified string. Port numbers are stripped from the URL if they match the default port number.  */
         urlSuffix?: string | undefined;
         /** Optional. Matches if the port of the URL is contained in any of the specified port lists. For example [80, 443, [1000, 1200]] matches all requests on port 80, 443 and in the range 1000-1200.  */
-        ports?: (number | number[])[] | undefined;
+        ports?: Array<number | number[]> | undefined;
         /**
          * Optional.
          * Since Chrome 28.
@@ -5394,6 +5394,86 @@ declare namespace chrome.input.ime {
     export var onReset: InputResetEvent;
 }
 
+/**
+ * Use chrome.instanceID to access the Instance ID service.
+ * Permissions: "gcm"
+ * @since Chrome 44.
+ */
+declare namespace chrome.instanceID {
+    export interface TokenRefreshEvent extends chrome.events.Event<() => void> {}
+
+    /**
+     * Resets the app instance identifier and revokes all tokens associated with it.
+     *
+     * The `deleteID()` method doesn't return any value, but can be used with a callback or asynchronously,
+     * with a Promise (MV3 only).
+     */
+    export function deleteID(): Promise<void>;
+    export function deleteID(callback: () => void): void;
+
+    interface DeleteTokenParams {
+        /**
+         * Identifies the entity that is authorized to access resources associated with this Instance ID.
+         * It can be a project ID from Google developer console.
+         */
+        authorizedEntity: string;
+        /**
+         * Identifies authorized actions that the authorized entity can take.
+         * In other words, the scope that is used to obtain the token.
+         * E.g. for sending GCM messages, `GCM` scope should be used.
+         */
+        scope: string;
+    }
+    /**
+     * Revoked a granted token.
+     *
+     * The `deleteToken()` method doesn't return any value, but can be used with a callback or
+     * asynchronously, with a Promise (MV3 only).
+     */
+    export function deleteToken(deleteTokenParams: DeleteTokenParams): Promise<void>;
+    export function deleteToken(
+        deleteTokenParams: DeleteTokenParams,
+        callback: () => void,
+    ): void;
+
+    /**
+     * Retrieves the time when the InstanceID has been generated.
+     *
+     * @return The time when the Instance ID has been generated, represented in milliseconds since the epoch.
+     * It can return via a callback or asynchronously, with a Promise (MV3 only).
+     */
+    export function getCreationTime(): Promise<number>;
+    export function getCreationTime(callback: (creationTime: number) => void): void;
+
+    /**
+     * Retrieves an identifier for the app instance.
+     * The same ID will be returned as long as the application identity has not been revoked or expired.
+     *
+     * @return An Instance ID assigned to the app instance. Can be returned by a callback or a Promise (MV3 only).
+     */
+    export function getID(): Promise<string>;
+    export function getID(callback: (instanceID: string) => void): void;
+
+    interface GetTokenParams extends DeleteTokenParams {
+        /**
+         * Allows including a small number of string key/value pairs that will be associated with the token
+         * and may be used in processing the request.
+         *
+         * @deprecated Since Chrome 89. `options` are deprecated and will be ignored.
+         */
+        options?: { [key: string]: string };
+    }
+    /**
+     * Return a token that allows the authorized entity to access the service defined by scope.
+     *
+     * @return A token assigned by the requested service. Can be returned by a callback or a Promise (MV3 only).
+     */
+    export function getToken(getTokenParams: GetTokenParams): Promise<string>;
+    export function getToken(getTokenParams: GetTokenParams, callback: (token: string) => void): void;
+
+    export var onTokenRefresh: TokenRefreshEvent;
+}
+
 ////////////////////
 // LoginState
 ////////////////////
@@ -6242,6 +6322,11 @@ declare namespace chrome.pageCapture {
      * Parameter mhtmlData: The MHTML data as a Blob.
      */
     export function saveAsMHTML(details: SaveDetails, callback: (mhtmlData?: Blob) => void): void;
+    /**
+     * Saves the content of the tab with given id as MHTML.
+     * @since Chrome 116 MV3
+     */
+    export function saveAsMHTML(details: SaveDetails): Promise<Blob | undefined>;
 }
 
 ////////////////////
@@ -6952,6 +7037,14 @@ declare namespace chrome.runtime {
     export type PlatformArch = "arm" | "arm64" | "x86-32" | "x86-64" | "mips" | "mips64";
     /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-PlatformNaclArch */
     export type PlatformNaclArch = "arm" | "x86-32" | "x86-64" | "mips" | "mips64";
+    /** https://developer.chrome.com/docs/extensions/reference/api/runtime#type-ContextFilter */
+    export enum ContextType {
+        TAB = "TAB",
+        POPUP = "POPUP",
+        BACKGROUND = "BACKGROUND",
+        OFFSCREEN_DOCUMENT = "OFFSCREEN_DOCUMENT",
+        SIDE_PANEL = "SIDE_PANEL",
+    }
     /** https://developer.chrome.com/docs/extensions/reference/runtime/#type-OnInstalledReason */
     export enum OnInstalledReason {
         INSTALL = "install",
@@ -6963,6 +7056,22 @@ declare namespace chrome.runtime {
     export interface LastError {
         /** Optional. Details about the error which occurred.  */
         message?: string | undefined;
+    }
+
+    /**
+     * A filter to match against certain extension contexts. Matching contexts must match all specified filters; any filter that is not specified matches all available contexts. Thus, a filter of `{}` will match all available contexts.
+     * @since Chrome 114.
+     */
+    export interface ContextFilter {
+        contextIds?: string[] | undefined;
+        contextTypes?: ContextType[] | undefined;
+        documentIds?: string[] | undefined;
+        documentOrigins?: string[] | undefined;
+        documentUrls?: string[] | undefined;
+        frameIds?: number[] | undefined;
+        incognito?: boolean | undefined;
+        tabIds?: number[] | undefined;
+        windowIds?: number[] | undefined;
     }
 
     export interface ConnectInfo {
@@ -6986,6 +7095,40 @@ declare namespace chrome.runtime {
          * @since Chrome 29.
          */
         id?: string | undefined;
+    }
+
+    /**
+     * A context hosting extension content.
+     * @since Chrome 114.
+     */
+    export interface ExtensionContext {
+        /** A unique identifier for this context */
+        contextId: string;
+        /** The type of context this corresponds to. */
+        contextType: ContextType;
+        /**
+         * Optional.
+         * A UUID for the document associated with this context, or undefined if this context is hosted not in a document.
+         */
+        documentId?: string | undefined;
+        /**
+         * Optional.
+         * The origin of the document associated with this context, or undefined if the context is not hosted in a document.
+         */
+        documentOrigin?: string | undefined;
+        /**
+         * Optional.
+         * The URL of the document associated with this context, or undefined if the context is not hosted in a document.
+         */
+        documentUrl?: string | undefined;
+        /** The ID of the frame for this context, or -1 if this context is not hosted in a frame. */
+        frameId: number;
+        /** Whether the context is associated with an incognito profile. */
+        incognito: boolean;
+        /** The ID of the tab for this context, or -1 if this context is not hosted in a tab. */
+        tabId: number;
+        /** The ID of the window for this context, or -1 if this context is not hosted in a window. */
+        windowId: number;
     }
 
     export interface MessageOptions {
@@ -7235,7 +7378,9 @@ declare namespace chrome.runtime {
         icons?: ManifestIcons | undefined;
 
         // Optional
-        author?: string | undefined;
+        author?: {
+            email: string;
+        } | undefined;
         background_page?: string | undefined;
         chrome_settings_overrides?: {
             homepage?: string | undefined;
@@ -7270,37 +7415,45 @@ declare namespace chrome.runtime {
             matches?: string[] | undefined;
             permissions?: string[] | undefined;
         } | undefined;
-        content_scripts?: {
-            matches?: string[] | undefined;
-            exclude_matches?: string[] | undefined;
-            css?: string[] | undefined;
-            js?: string[] | undefined;
-            run_at?: string | undefined;
-            all_frames?: boolean | undefined;
-            match_about_blank?: boolean | undefined;
-            include_globs?: string[] | undefined;
-            exclude_globs?: string[] | undefined;
-        }[] | undefined;
+        content_scripts?:
+            | Array<{
+                matches?: string[] | undefined;
+                exclude_matches?: string[] | undefined;
+                css?: string[] | undefined;
+                js?: string[] | undefined;
+                run_at?: string | undefined;
+                all_frames?: boolean | undefined;
+                match_about_blank?: boolean | undefined;
+                include_globs?: string[] | undefined;
+                exclude_globs?: string[] | undefined;
+            }>
+            | undefined;
         converted_from_user_script?: boolean | undefined;
         current_locale?: string | undefined;
         devtools_page?: string | undefined;
-        event_rules?: {
-            event?: string | undefined;
-            actions?: {
-                type: string;
-            }[] | undefined;
-            conditions?: chrome.declarativeContent.PageStateMatcherProperties[] | undefined;
-        }[] | undefined;
+        event_rules?:
+            | Array<{
+                event?: string | undefined;
+                actions?:
+                    | Array<{
+                        type: string;
+                    }>
+                    | undefined;
+                conditions?: chrome.declarativeContent.PageStateMatcherProperties[] | undefined;
+            }>
+            | undefined;
         externally_connectable?: {
             ids?: string[] | undefined;
             matches?: string[] | undefined;
             accepts_tls_channel_id?: boolean | undefined;
         } | undefined;
-        file_browser_handlers?: {
-            id?: string | undefined;
-            default_title?: string | undefined;
-            file_filters?: string[] | undefined;
-        }[] | undefined;
+        file_browser_handlers?:
+            | Array<{
+                id?: string | undefined;
+                default_title?: string | undefined;
+                file_filters?: string[] | undefined;
+            }>
+            | undefined;
         file_system_provider_capabilities?: {
             configurable?: boolean | undefined;
             watchable?: boolean | undefined;
@@ -7308,29 +7461,35 @@ declare namespace chrome.runtime {
             source?: string | undefined;
         } | undefined;
         homepage_url?: string | undefined;
-        import?: {
-            id: string;
-            minimum_version?: string | undefined;
-        }[] | undefined;
+        import?:
+            | Array<{
+                id: string;
+                minimum_version?: string | undefined;
+            }>
+            | undefined;
         export?: {
             whitelist?: string[] | undefined;
         } | undefined;
         incognito?: string | undefined;
-        input_components?: {
-            name?: string | undefined;
-            type?: string | undefined;
-            id?: string | undefined;
-            description?: string | undefined;
-            language?: string[] | string | undefined;
-            layouts?: string[] | undefined;
-            indicator?: string | undefined;
-        }[] | undefined;
+        input_components?:
+            | Array<{
+                name?: string | undefined;
+                type?: string | undefined;
+                id?: string | undefined;
+                description?: string | undefined;
+                language?: string[] | string | undefined;
+                layouts?: string[] | undefined;
+                indicator?: string | undefined;
+            }>
+            | undefined;
         key?: string | undefined;
         minimum_chrome_version?: string | undefined;
-        nacl_modules?: {
-            path: string;
-            mime_type: string;
-        }[] | undefined;
+        nacl_modules?:
+            | Array<{
+                path: string;
+                mime_type: string;
+            }>
+            | undefined;
         oauth2?: {
             client_id: string;
             scopes?: string[] | undefined;
@@ -7345,13 +7504,17 @@ declare namespace chrome.runtime {
             chrome_style?: boolean | undefined;
             open_in_tab?: boolean | undefined;
         } | undefined;
-        platforms?: {
-            nacl_arch?: string | undefined;
-            sub_package_path: string;
-        }[] | undefined;
-        plugins?: {
-            path: string;
-        }[] | undefined;
+        platforms?:
+            | Array<{
+                nacl_arch?: string | undefined;
+                sub_package_path: string;
+            }>
+            | undefined;
+        plugins?:
+            | Array<{
+                path: string;
+            }>
+            | undefined;
         requirements?: {
             "3D"?: {
                 features?: string[] | undefined;
@@ -7375,12 +7538,12 @@ declare namespace chrome.runtime {
             managed_schema: string;
         } | undefined;
         tts_engine?: {
-            voices: {
+            voices: Array<{
                 voice_name: string;
                 lang?: string | undefined;
                 gender?: string | undefined;
                 event_types?: string[] | undefined;
-            }[];
+            }>;
         } | undefined;
         update_url?: string | undefined;
         version_name?: string | undefined;
@@ -7421,18 +7584,20 @@ declare namespace chrome.runtime {
                 type?: "module"; // If the service worker uses ES modules
             }
             | undefined;
-        content_scripts?: {
-            matches?: string[] | undefined;
-            exclude_matches?: string[] | undefined;
-            css?: string[] | undefined;
-            js?: string[] | undefined;
-            run_at?: string | undefined;
-            all_frames?: boolean | undefined;
-            match_about_blank?: boolean | undefined;
-            include_globs?: string[] | undefined;
-            exclude_globs?: string[] | undefined;
-            world?: "ISOLATED" | "MAIN" | undefined;
-        }[] | undefined;
+        content_scripts?:
+            | Array<{
+                matches?: string[] | undefined;
+                exclude_matches?: string[] | undefined;
+                css?: string[] | undefined;
+                js?: string[] | undefined;
+                run_at?: string | undefined;
+                all_frames?: boolean | undefined;
+                match_about_blank?: boolean | undefined;
+                include_globs?: string[] | undefined;
+                exclude_globs?: string[] | undefined;
+                world?: "ISOLATED" | "MAIN" | undefined;
+            }>
+            | undefined;
         content_security_policy?: {
             extension_pages?: string;
             sandbox?: string;
@@ -7440,7 +7605,7 @@ declare namespace chrome.runtime {
         host_permissions?: string[] | undefined;
         optional_permissions?: ManifestPermissions[] | undefined;
         permissions?: ManifestPermissions[] | undefined;
-        web_accessible_resources?: { resources: string[]; matches: string[] }[] | undefined;
+        web_accessible_resources?: Array<{ resources: string[]; matches: string[] }> | undefined;
     }
 
     export type Manifest = ManifestV2 | ManifestV3;
@@ -7465,6 +7630,21 @@ declare namespace chrome.runtime {
     export function connectNative(application: string): Port;
     /** Retrieves the JavaScript 'window' object for the background page running inside the current extension/app. If the background page is an event page, the system will ensure it is loaded before calling the callback. If there is no background page, an error is set. */
     export function getBackgroundPage(callback: (backgroundPage?: Window) => void): void;
+    /**
+     * Fetches information about active contexts associated with this extension
+     * @since Chrome 116 MV3.
+     * @return Provides the matching context, if any via callback or returned as a `Promise` (MV3 only).
+     * @param filter A filter to find matching contexts. A context matches if it matches all specified fields in the filter. Any unspecified field in the filter matches all contexts.
+     */
+    export function getContexts(filter: ContextFilter): Promise<ExtensionContext[]>;
+    /**
+     * Fetches information about active contexts associated with this extension
+     * @since Chrome 116 MV3.
+     * @return Provides the matching context, if any via callback or returned as a `Promise` (MV3 only).
+     * @param filter A filter to find matching contexts. A context matches if it matches all specified fields in the filter. Any unspecified field in the filter matches all contexts.
+     * @param callback Called with results
+     */
+    export function getContexts(filter: ContextFilter, callback: (contexts: ExtensionContext[]) => void): void;
     /**
      * Returns details about the app or extension from the manifest. The object returned is a serialization of the full manifest file.
      * @return The manifest details.
@@ -7698,16 +7878,29 @@ declare namespace chrome.scripting {
     /* The JavaScript world for a script to execute within. */
     export type ExecutionWorld = "ISOLATED" | "MAIN";
 
-    export interface InjectionResult<T> {
-        /* The frame associated with the injection. */
+    export interface InjectionResult<T extends any = any> {
+        /**
+         * The document associated with the injection.
+         * @since Chrome 106.
+         */
+        documentId: string;
+        /**
+         * The frame associated with the injection.
+         * @since Chrome 90.
+         */
         frameId: number;
         /* The result of the script execution. */
-        result: T;
+        result?: T | undefined;
     }
 
     export interface InjectionTarget {
         /* Whether the script should inject into all frames within the tab. Defaults to false. This must not be true if frameIds is specified. */
         allFrames?: boolean | undefined;
+        /**
+         * The IDs of specific documentIds to inject into. This must not be set if frameIds is set.
+         * @since Chrome 106.
+         */
+        documentIds?: string[] | undefined;
         /* The IDs of specific frames to inject into. */
         frameIds?: number[] | undefined;
         /* The ID of the tab into which to inject. */
@@ -7781,7 +7974,7 @@ declare namespace chrome.scripting {
      */
     export function executeScript<Args extends any[], Result>(
         injection: ScriptInjection<Args, Result>,
-    ): Promise<InjectionResult<Awaited<Result>>[]>;
+    ): Promise<Array<InjectionResult<Awaited<Result>>>>;
 
     /**
      * Injects a script into a target context. The script will be run at document_end.
@@ -7792,7 +7985,7 @@ declare namespace chrome.scripting {
      */
     export function executeScript<Args extends any[], Result>(
         injection: ScriptInjection<Args, Result>,
-        callback: (results: InjectionResult<Awaited<Result>>[]) => void,
+        callback: (results: Array<InjectionResult<Awaited<Result>>>) => void,
     ): void;
 
     /**
@@ -11268,10 +11461,12 @@ declare namespace chrome.webRequest {
 
     export interface WebRequestBodyEvent extends
         chrome.events.EventWithRequiredFilterInAddListener<
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
             (details: WebRequestBodyDetails) => BlockingResponse | void
         >
     {
         addListener(
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
             callback: (details: WebRequestBodyDetails) => BlockingResponse | void,
             filter: RequestFilter,
             opt_extraInfoSpec?: string[],
@@ -11280,10 +11475,12 @@ declare namespace chrome.webRequest {
 
     export interface WebRequestHeadersSynchronousEvent extends
         chrome.events.EventWithRequiredFilterInAddListener<
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
             (details: WebRequestHeadersDetails) => BlockingResponse | void
         >
     {
         addListener(
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
             callback: (details: WebRequestHeadersDetails) => BlockingResponse | void,
             filter: RequestFilter,
             opt_extraInfoSpec?: string[],
@@ -11308,10 +11505,12 @@ declare namespace chrome.webRequest {
 
     export interface WebResponseHeadersEvent extends
         chrome.events.EventWithRequiredFilterInAddListener<
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
             (details: WebResponseHeadersDetails) => BlockingResponse | void
         >
     {
         addListener(
+            // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
             callback: (details: WebResponseHeadersDetails) => BlockingResponse | void,
             filter: RequestFilter,
             opt_extraInfoSpec?: string[],
@@ -12331,6 +12530,17 @@ declare namespace chrome.declarativeNetRequest {
         removeRuleIds?: number[] | undefined;
     }
 
+    export interface UpdateStaticRulesOptions {
+        /** Set of ids corresponding to rules in the Ruleset to disable. */
+        disableRuleIds?: number[];
+
+        /** Set of ids corresponding to rules in the Ruleset to enable. */
+        enableRuleIds?: number[];
+
+        /** The id corresponding to a static Ruleset. */
+        rulesetId: string;
+    }
+
     export interface UpdateRulesetOptions {
         /** The set of ids corresponding to a static Ruleset that should be disabled. */
         disableRulesetIds?: string[] | undefined;
@@ -12546,6 +12756,15 @@ declare namespace chrome.declarativeNetRequest {
      * This can happen for multiple reasons, such as invalid rule format, duplicate rule ID, rule count limit exceeded, and others.
      */
     export function updateSessionRules(options: UpdateRuleOptions): Promise<void>;
+
+    /** Disables and enables individual static rules in a Ruleset.
+     * Changes to rules belonging to a disabled Ruleset will take effect the next time that it becomes enabled.
+     *
+     * @return The `updateStaticRules` method either calls a provided callback if its finished or returns as a `Promise` (MV3 only).
+     * @since Chrome 111
+     */
+    export function updateStaticRules(options: UpdateStaticRulesOptions): Promise<void>;
+    export function updateStaticRules(options: UpdateStaticRulesOptions, callback?: () => void): void;
 
     /** The rule that has been matched along with information about the associated request. */
     export interface RuleMatchedDebugEvent extends chrome.events.Event<(info: MatchedRuleInfoDebug) => void> {}
